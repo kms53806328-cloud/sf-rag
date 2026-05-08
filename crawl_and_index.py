@@ -28,7 +28,7 @@ SF_DIRS = [
 ]
 
 HF_EMBED_URL = (
-    "https://api-inference.huggingface.co/pipeline/feature-extraction/"
+    "https://api-inference.huggingface.co/models/"
     "sentence-transformers/all-MiniLM-L6-v2"
 )
 
@@ -146,6 +146,8 @@ def upsert_chunks(index, chunks: list[dict], batch_size: int = 50):
     # Upsert to Pinecone in batches
     records = []
     for idx, (chunk, vec) in enumerate(zip(chunks, vectors)):
+        if all(v == 0.0 for v in vec):  # skip zero vectors
+            continue
         records.append({
             "id":       f"{chunk['source']}_{idx}",
             "values":   vec,
