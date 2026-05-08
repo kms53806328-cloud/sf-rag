@@ -1,0 +1,28 @@
+name: Crawl & Index SF Docs
+
+on:
+  workflow_dispatch:       # manual trigger
+  schedule:
+    - cron: "0 3 * * 0"   # every Sunday 03:00 UTC (auto re-index)
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pinecone-client requests python-dotenv
+
+      - name: Run crawler
+        env:
+          PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+          HF_API_KEY:       ${{ secrets.HF_API_KEY }}
+          GITHUB_TOKEN:     ${{ secrets.GITHUB_TOKEN }}
+        run: python crawl_and_index.py
