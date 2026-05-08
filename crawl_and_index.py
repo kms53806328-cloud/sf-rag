@@ -8,29 +8,26 @@ import re
 import time
 import requests
 from pinecone import Pinecone, ServerlessSpec
+from sentence_transformers import SentenceTransformer
 
-# ── Config ──────────────────────────────────────────────────────────────────
 PINECONE_API_KEY = os.environ["PINECONE_API_KEY"]
-HF_API_KEY       = os.environ["HF_API_KEY"]
 INDEX_NAME       = "sf-docs"
-EMBED_DIM        = 384  # all-MiniLM-L6-v2
+EMBED_DIM        = 384
 
-GITHUB_TOKEN     = os.environ.get("GITHUB_TOKEN", "")
-GITHUB_HEADERS   = {"Authorization": f"token {GITHUB_TOKEN}"} if GITHUB_TOKEN else {}
+GITHUB_TOKEN   = os.environ.get("GITHUB_TOKEN", "")
+GITHUB_HEADERS = {"Authorization": f"token {GITHUB_TOKEN}"} if GITHUB_TOKEN else {}
 
-# SF library directories to crawl
 SF_DIRS = [
     "lua/starfall/libs_sh",
     "lua/starfall/libs_cl",
     "lua/starfall/libs_sv",
-    "lua/starfall/libs_oop",
-    "lua/starfall/editor/docs",
 ]
 
-HF_EMBED_URL = (
-    "https://api-inference.huggingface.co/models/"
-    "sentence-transformers/all-MiniLM-L6-v2"
-)
+# Load model once at startup
+print("Loading embedding model...")
+MODEL = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+print("Model loaded.")
+
 
 # ── GitHub helpers ───────────────────────────────────────────────────────────
 def gh_list(path: str) -> list:
@@ -111,25 +108,9 @@ def parse_chunks(filepath: str, source: str) -> list[dict]:
     return chunks
 
 # ── Embedding ────────────────────────────────────────────────────────────────
-def embed_batch(texts: list[str], retries: int = 3) -> list[list[float]]:
-    for attempt in range(retries):
-        try:
-            r = requests.post(
-                HF_EMBED_URL,
-                headers={"Authorization": f"Bearer {HF_API_KEY}"},
-                json={"inputs": texts, "options": {"wait_for_model": True}},
-                timeout=60,
-            )
-            data = r.json()
-            if isinstance(data, list):
-                # If single text was sent, HF might return a flat list
-                if texts and isinstance(data[0], float):
-                    return [data]
-                return data
-        except Exception as e:
-            print(f"  embed error (attempt {attempt+1}): {e}")
-            time.sleep(2 ** attempt)
-    return [[0.0] * EMBED_DIM] * len(texts)
+def embed_batch(texts: list[str]) -> list[list[float]]:
+    vectors = MODEL.encode(texts, normalize_embeddings=True)
+    return vectors.tolist()
 
 # ── Pinecone upsert ──────────────────────────────────────────────────────────
 def upsert_chunks(index, chunks: list[dict], batch_size: int = 50):
