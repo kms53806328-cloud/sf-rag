@@ -18,7 +18,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install pinecone-client requests python-dotenv
+        run: pip install pinecone requests python-dotenv
 
       - name: Run crawler
         env:
